@@ -1,0 +1,129 @@
+TODO:
+how does oracle dataguard work
+make statment package
+reinvent the naming convintion
+change the names of any exportable objects like UserIdt => user.Idt
+make function to remove duplicated value from accepts struct
+parse the error and convert the user and token slices to hexadecimal
+convert any user and token slices to hexadecimal for the user and vice versa
+make algorthim to close the circle debits by write new entries . it will work on seperated threed and it will lisen allways to the debits map variable
+make token language syntax chek and interpreter
+i will use fyne later for gui instead of flutter because to simplify the codebase
+
+DOING:
+make the defuculty of block using bit instead byte
+how to make two response in two different time for the request in golang
+learn system design
+i should start to design the token language and info that mean stop programming for a while	//TODO Check the token code,Check the token info
+learn other languages and search for open surce interpreters
+unit test the entry
+learn the git tutorial
+
+DONE:
+file:///C:/Users/hashem/Desktop/books/iota_whitepaper.pdf
+https://ethereum.org/whitepaper
+https://bitcoin.org/bitcoin.pdf
+implement load balancer https://dev.to/bmf_san/implement-a-load-balancer-in-golang-8gj
+fix the bug in the test output , he allways return the prviuse output he dont run the test
+relearn badger db ,the problem was not in my code but it was with the test extention n vscode , i relized this because i use time.sleep and he dont sleep he just return the prviuse output test
+make function to init the maps variables
+make kv database for storing the entry hash for the user
+complete the map tUserIdTokenIdBalance 
+enhance the ErrorTest function
+make the sever interface
+make the srever interface for user
+change the package name in Errorf
+make every requast and respons as json
+i should to encode and decode every massege
+learn http package
+make the server gess with function should use
+make the size of the massege limitless
+complete the http to use it later in the code
+learn how to make server
+change the folder from api to client
+seperate the project to small packeges and add main packege, every folder contain folders(api,server,lib)
+make function to remove duplicated value from entry struct
+make error handeler function by index and package name
+change the struct of the entry to remove the map to make the sever have nil safty
+make the error index to handele the error better
+
+MAY BE NOT:
+learn AES
+see this i think it helps https://www.mongodb.com/databases/blockchain-database
+to devolop the test function you need to auto generate random values for the function you tested that will help you to generate test fast
+make function call graph and packeges call graph
+make functions to get the requast and return the balance of token and user or any other data and send it to him to help him to make smart contract on his server and take from him charg for every requast
+edit go-callvis (edit the output photo to make all the package functions inside small border)
+make program to get all the symbols (type var const func) in program
+encode and decode the error and interface
+make package for the token to seperate it from the entry , i dont think it worth because of the cycle import error happen
+change the path of the database folder to make it predeterministic , i cant because the path is deffrent from linux and widows
+make smart contract packege => it will write entry if token_balance1>num1 and token_balance2>num2 true . it will run on server becuse that will be faster and i think it will make for me money for every smart contract
+make golang profiling
+edit go-callvis (make the input just the folder path, make it work with all packages not just main) it fails because the problem is the analyses package need main function and package . but is still need it to learn code fast
+make data flow graph
+
+
+
+
+
+
+STANDARDS:
+if there is error allways return zero value
+
+NOTES:
+Object-oriented languages are good when you have a fixed set of operations on things,
+and as your code evolves,
+you primarily add new things.
+This can be accomplished by adding new classes which implement existing methods,
+and the existing classes are left alone.
+
+Functional languages are good when you have a fixed set of things,
+and as your code evolves, 
+you primarily add new operations on existing things.
+This can be accomplished by adding new functions which compute with existing data types,
+and the existing functions are left alone.
+
+unlike Bitcoin, Ethereum blocks contain a copy of both the transaction list and the most recent state.
+
+height: the length of the longest oriented path to the genesis.
+depth: the length of the longest reverse-oriented path to some tip.
+score: By definition, the score of a transaction is the sum of own weights ofall transactions approved by this transaction plus the own weight of the transactionitself.
+
+REFACTOR THE SYSTEM:
+find bitcoin and eth and iota source code
+read the all the eth docoment
+try to make dag because it is faster and scaleble
+learn dag and iota tangle source code
+learn language for system design
+make the database as seperated program with requast and response
+i need dynamic load balancer
+i think i need pos or pow consistanc algorithim
+read C:\Users\hashem\Desktop\books\d60fa09a-c4b5-4e31-9dbd-5d049c6c8f49.pdf
+i need to make it master-master ripliction
+i need to use privet public key algorithim
+learn how to make decentralized database
+use docoment database for blockchain because it is fast in writing
+i should write blockchain package and use it , that instead of oracle dataguard
+see https://medium.com/coinmonks/implementing-proof-of-work-and-proof-of-stake-in-golang-dbedb237c515
+
+
+IAM IN:
+https://www.the-paper-trail.org/post/2008-08-13-a-brief-tour-of-flp-impossibility/
+https://www.the-paper-trail.org/post/2012-03-25-flp-and-cap-arent-the-same-thing/
+
+https://github.com/donnemartin/system-design-primer?tab=readme-ov-file#application-layer
+
+https://eprint.iacr.org/2011/191.pdf
+
+https://ethereum.org/developers/docs/data-structures-and-encoding/patricia-merkle-trie
+https://www.geeksforgeeks.org/delegated-proof-of-stake/
+https://ethereum.github.io/yellowpaper/paper.pdf
+https://wiki.iota.org/learn/protocols/introduction/
+file:///C:/Users/hashem/Desktop/books/zcash_whitepaper.pdf
+file:///C:/Users/hashem/Desktop/books/Monero_whitepaper.pdf
+file:///C:/Users/hashem/Desktop/books/A%20Review%20of%20zk-SNARKs.pdf
+file:///C:/Users/hashem/Desktop/books/zk-SNARK.pdf
+https://georgetown.zoom.us/rec/play/5zfMsmX-p8zOarjeUJHV9nYqrPzp1tr84mGvlgbyUmW5XHgSNrZ6-KY0jJf3t2rdApCm0uxkNag7-F0.0J56nOYXDgyd-4E-?canPlayFromShare=true&from=share_recording_detail&startTime=1639755325000&componentName=rec-play&originRequestUrl=https%3A%2F%2Fgeorgetown.zoom.us%2Frec%2Fshare%2FI4VPUnsqQ1mO2QtAunZWK4k39U6hFAYYZXPDpqo0VSbsd1Y5_IwerOz7zSM0KVGR.rSjQP66cDuixd-Ft%3FstartTime%3D1639755325000
+
+the name of my project will be 282

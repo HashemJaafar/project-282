@@ -1,0 +1,12 @@
+go 1.22.1
+
+use (
+	./cmt
+	./determinants
+	./dht
+	./encryption
+	./entry
+	./ht
+	./my_database
+	./tools
+)
