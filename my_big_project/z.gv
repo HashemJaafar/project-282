@@ -1,0 +1,140 @@
+digraph gocallvis {
+    label="main";
+    labeljust="l";
+    fontname="Arial";
+    fontsize="14";
+    rankdir="LR";
+    bgcolor="lightgray";
+    style="solid";
+    penwidth="0.5";
+    pad="0.0";
+    nodesep="0.35";
+
+    node [shape="box" style="filled,rounded" fillcolor="honeydew" fontname="Verdana" penwidth="1.0" margin="0.05,0.0"];
+    edge [minlen="2"]
+
+    subgraph "cluster_focus" {
+        bgcolor="#e6ecfa";
+label="main";
+labelloc="t";
+labeljust="c";
+fontsize="18";
+        
+        "main.main" [ penwidth="0.5" tooltip="main.main | defined in main.go:86\nat main.go:88: calling [entry.Server]\nat main.go:91: calling [(*main.Blockchain).AddBlock]\nat main.go:92: calling [(*main.Blockchain).AddBlock]\nat main.go:93: calling [(*main.Blockchain).AddBlock]\nat main.go:94: calling [(*main.Blockchain).AddBlock]\nat main.go:95: calling [(*main.Blockchain).AddBlock]\nat main.go:96: calling [(*main.Blockchain).AddBlock]\nat main.go:97: calling [(*main.Blockchain).AddBlock]\nat main.go:98: calling [(*main.Blockchain).AddBlock]\nat main.go:99: calling [(*main.Blockchain).AddBlock]\nat main.go:103: calling [text/tabwriter.NewWriter]\nat main.go:105: calling [fmt.Fprintf]\nat main.go:89: calling [main.CreateBlockchain]\nat main.go:101: calling [(main.Blockchain).IsValid]\nat main.go:87: calling [user.Server]\nat main.go:101: calling [fmt.Println]\nat main.go:107: calling [(*text/tabwriter.Writer).Flush]" fillcolor="lightblue" label="main" ]
+        "main.CreateBlockchain" [ fillcolor="lightblue" label="CreateBlockchain" penwidth="1.5" tooltip="main.CreateBlockchain | defined in main.go:54" ]
+        "(main.Block).calculateHash" [ penwidth="0.5" tooltip="(main.Block).calculateHash | defined in main.go:31\nat main.go:32: calling [tools.Encode]\nat main.go:33: calling [crypto/sha256.Sum256]" fillcolor="lightblue" label="(Block).calculateHash" ]
+        "(*main.Block).mine" [ fillcolor="lightblue" label="(*Block).mine" penwidth="0.5" tooltip="(*main.Block).mine | defined in main.go:36\nat main.go:47: calling [(main.Block).calculateHash]\nat main.go:48: calling [(*main.Block).mine$1]" ]
+        "(*main.Block).mine$1" [ fillcolor="lightblue" label="(*Block).mine$1" style="dotted,filled" tooltip="(*main.Block).mine$1 | defined in main.go:37" ]
+        "(*main.Blockchain).AddBlock" [ tooltip="(*main.Blockchain).AddBlock | defined in main.go:61\nat main.go:72: calling [(*main.Block).mine]" fillcolor="lightblue" label="(*Blockchain).AddBlock" penwidth="1.5" ]
+        "(main.Blockchain).IsValid" [ fillcolor="lightblue" label="(Blockchain).IsValid" penwidth="1.5" tooltip="(main.Blockchain).IsValid | defined in main.go:76\nat main.go:80: calling [(main.Block).calculateHash]" ]
+        
+        subgraph "cluster_crypto/sha256" {
+        label="crypto/sha256";
+style="filled";
+fontname="Tahoma bold";
+rank="sink";
+URL="/?f=crypto/sha256";
+tooltip="package: crypto/sha256";
+penwidth="0.8";
+fontsize="16";
+fillcolor="#E0FFE1";
+        
+        "crypto/sha256.Sum256" [ fillcolor="#adedad" label="Sum256" penwidth="1.5" tooltip="crypto/sha256.Sum256 | defined in sha256.go:253" ]
+        
+    }
+
+        subgraph "cluster_entry" {
+        rank="sink";
+label="entry";
+tooltip="package: entry";
+penwidth="0.8";
+fontsize="16";
+style="filled";
+fillcolor="lightyellow";
+fontname="Tahoma bold";
+URL="/?f=entry";
+        
+        "entry.Server" [ fillcolor="moccasin" label="Server" penwidth="1.5" tooltip="entry.Server | defined in lib.go:507" ]
+        
+    }
+
+        subgraph "cluster_fmt" {
+        rank="sink";
+URL="/?f=fmt";
+penwidth="0.8";
+fontsize="16";
+style="filled";
+fillcolor="#E0FFE1";
+fontname="Tahoma bold";
+label="fmt";
+tooltip="package: fmt";
+        
+        "fmt.Println" [ penwidth="1.5" tooltip="fmt.Println | defined in print.go:313" fillcolor="#adedad" label="Println" ]
+        "fmt.Fprintf" [ tooltip="fmt.Fprintf | defined in print.go:222" fillcolor="#adedad" label="Fprintf" penwidth="1.5" ]
+        
+    }
+
+        subgraph "cluster_text/tabwriter" {
+        fillcolor="#E0FFE1";
+fontname="Tahoma bold";
+tooltip="package: text/tabwriter";
+penwidth="0.8";
+style="filled";
+label="text/tabwriter";
+URL="/?f=text/tabwriter";
+fontsize="16";
+rank="sink";
+        
+        "text/tabwriter.NewWriter" [ tooltip="text/tabwriter.NewWriter | defined in tabwriter.go:598" fillcolor="#adedad" label="NewWriter" penwidth="1.5" ]
+        "(*text/tabwriter.Writer).Flush" [ fillcolor="#adedad" label="(*Writer).Flush" penwidth="1.5" tooltip="(*text/tabwriter.Writer).Flush | defined in tabwriter.go:487" ]
+        
+    }
+
+        subgraph "cluster_tools" {
+        tooltip="package: tools";
+fontsize="16";
+fontname="Tahoma bold";
+rank="sink";
+URL="/?f=tools";
+penwidth="0.8";
+style="filled";
+fillcolor="lightyellow";
+label="tools";
+        
+        "tools.Encode" [ tooltip="tools.Encode | defined in lib.go:120" fillcolor="moccasin" label="Encode" penwidth="1.5" ]
+        
+    }
+
+        subgraph "cluster_user" {
+        penwidth="0.8";
+style="filled";
+fillcolor="lightyellow";
+fontname="Tahoma bold";
+rank="sink";
+label="user";
+URL="/?f=user";
+tooltip="package: user";
+fontsize="16";
+        
+        "user.Server" [ fillcolor="moccasin" label="Server" penwidth="1.5" tooltip="user.Server | defined in lib.go:41" ]
+        
+    }
+
+    }
+
+    "main.main" -> "entry.Server" [ color="saddlebrown" tooltip="at main.go:88: calling [entry.Server]" ]
+    "(*main.Block).mine" -> "(main.Block).calculateHash" [ tooltip="at main.go:47: calling [(main.Block).calculateHash]" ]
+    "(*main.Block).mine" -> "(*main.Block).mine$1" [ tooltip="at main.go:48: calling [(*main.Block).mine$1]" ]
+    "main.main" -> "(*main.Blockchain).AddBlock" [ tooltip="at main.go:91: calling [(*main.Blockchain).AddBlock]\nat main.go:92: calling [(*main.Blockchain).AddBlock]\nat main.go:93: calling [(*main.Blockchain).AddBlock]\nat main.go:94: calling [(*main.Blockchain).AddBlock]\nat main.go:95: calling [(*main.Blockchain).AddBlock]\nat main.go:96: calling [(*main.Blockchain).AddBlock]\nat main.go:97: calling [(*main.Blockchain).AddBlock]\nat main.go:98: calling [(*main.Blockchain).AddBlock]\nat main.go:99: calling [(*main.Blockchain).AddBlock]" ]
+    "main.main" -> "text/tabwriter.NewWriter" [ color="saddlebrown" tooltip="at main.go:103: calling [text/tabwriter.NewWriter]" ]
+    "(*main.Blockchain).AddBlock" -> "(*main.Block).mine" [ tooltip="at main.go:72: calling [(*main.Block).mine]" ]
+    "main.main" -> "fmt.Fprintf" [ color="saddlebrown" tooltip="at main.go:105: calling [fmt.Fprintf]" ]
+    "main.main" -> "main.CreateBlockchain" [ tooltip="at main.go:89: calling [main.CreateBlockchain]" ]
+    "main.main" -> "(main.Blockchain).IsValid" [ tooltip="at main.go:101: calling [(main.Blockchain).IsValid]" ]
+    "main.main" -> "user.Server" [ color="saddlebrown" tooltip="at main.go:87: calling [user.Server]" ]
+    "(main.Block).calculateHash" -> "tools.Encode" [ color="saddlebrown" tooltip="at main.go:32: calling [tools.Encode]" ]
+    "(main.Block).calculateHash" -> "crypto/sha256.Sum256" [ color="saddlebrown" tooltip="at main.go:33: calling [crypto/sha256.Sum256]" ]
+    "(main.Blockchain).IsValid" -> "(main.Block).calculateHash" [ tooltip="at main.go:80: calling [(main.Block).calculateHash]" ]
+    "main.main" -> "fmt.Println" [ color="saddlebrown" tooltip="at main.go:101: calling [fmt.Println]" ]
+    "main.main" -> "(*text/tabwriter.Writer).Flush" [ color="saddlebrown" tooltip="at main.go:107: calling [(*text/tabwriter.Writer).Flush]" ]
+}
