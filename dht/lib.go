@@ -9,13 +9,11 @@ import (
 	"encryption"
 	"errors"
 	"fmt"
-	"ht"
 	"io"
 	"math/big"
 	"net/http"
 	"os"
 	"slices"
-	"sync"
 	"time"
 	"tools"
 )
@@ -46,29 +44,56 @@ func valueDecoding(i valueVector) valueStruct {
 }
 
 type (
-	RequestVector []byte
+	KeyValueVector []byte
 
-	RequestStruct struct {
-		Message   []byte
+	KeyValueStruct struct {
+		Key   []byte
+		Value []byte
+	}
+)
+
+func KeyValueEncoding(i KeyValueStruct) KeyValueVector {
+	KeySize := make([]byte, 4)
+	binary.BigEndian.PutUint32(KeySize, uint32(len(i.Key)))
+
+	return KeyValueVector(slices.Concat(KeySize, i.Key, i.Value))
+}
+
+func KeyValueDecoding(i KeyValueVector) KeyValueStruct {
+	KeySize := binary.BigEndian.Uint32(i[:4])
+
+	return KeyValueStruct{
+		Key:   i[4 : 4+KeySize],
+		Value: i[4+KeySize:],
+	}
+}
+
+type (
+	MessageVector []byte
+
+	MessageStruct struct {
+		KeyValue  []byte
 		Signature encryption.Signature
 	}
 )
 
-func RequestEncoding(i RequestStruct) RequestVector {
-	b := make([]byte, 4)
-	binary.BigEndian.PutUint32(b, uint32(len(i.Message)))
+func MessageEncoding(i MessageStruct) MessageVector {
+	KeyValueSize := make([]byte, 4)
+	binary.BigEndian.PutUint32(KeyValueSize, uint32(len(i.KeyValue)))
 
-	return RequestVector(slices.Concat(b, i.Message, i.Signature))
+	return MessageVector(slices.Concat(KeyValueSize, i.KeyValue, i.Signature))
 }
 
-func RequestDecoding(i RequestVector) RequestStruct {
-	theStartOfSig := binary.BigEndian.Uint32(i[:4]) + 4
+func MessageDecoding(i MessageVector) MessageStruct {
+	KeyValueSize := binary.BigEndian.Uint32(i[:4])
 
-	return RequestStruct{
-		Message:   i[4:theStartOfSig],
-		Signature: encryption.Signature(i[theStartOfSig:]),
+	return MessageStruct{
+		KeyValue:  i[4 : 4+KeyValueSize],
+		Signature: encryption.Signature(i[4+KeyValueSize:]),
 	}
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////////
 
 type nodeInfo struct {
 	IPAddress            string
@@ -98,17 +123,15 @@ var leader = struct {
 }
 
 type DHT struct {
-	methodes       methodes
-	dbName         string
-	isValueDynamic bool
-	isKeyHashed    bool
+	methodes         methodes
+	dbName           string
+	isValueUpdatable bool // if no that mean key==hash(value)
+	isKey32Byte      bool // if yes we dont need to hash it
 }
 
 type methodes interface {
 	Open() error
 	Close() error
-	MessageEncoding(key []byte, value []byte) ([]byte, error)
-	MessageDecoding(Message []byte) ([]byte, []byte, error)
 	Put(key []byte, value []byte) error
 	Get(key []byte) ([]byte, bool, error)
 	Delete(key []byte) error
@@ -133,15 +156,15 @@ func UpdateRoutingTable(mux *http.ServeMux) {
 			return
 		}
 
-		Request := RequestDecoding(req1)
+		Request := MessageDecoding(req1)
 
-		err = encryption.VerifiSignature(&leader.PublicKey, Request.Message, Request.Signature)
+		err = encryption.VerifiSignature(&leader.PublicKey, Request.KeyValue, Request.Signature)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		table, err := tools.Decode[[]nodeInfo](Request.Message)
+		table, err := tools.Decode[[]nodeInfo](Request.KeyValue)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -168,38 +191,16 @@ func (s DHT) Open(mux *http.ServeMux) error {
 	}
 
 	//////////////////////////////////////////////////////////////////////////////////
-	if s.isValueDynamic {
+	if s.isValueUpdatable {
 		mux.HandleFunc(pattern("Unlock"), func(w http.ResponseWriter, req *http.Request) {
 
-			IPAddress := req.RemoteAddr
-			nodeInfo, ok := routingTable[IPAddress]
-
-			if !ok {
-				http.Error(w, "you are not authorized to access the system", http.StatusBadRequest)
-				return
-			}
-
-			req1, err := io.ReadAll(req.Body)
+			nodeInfo, keyValue, err := step2(req)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 
-			Request := RequestDecoding(req1)
-
-			err = encryption.VerifiSignature(&nodeInfo.PublicKey, Request.Message, Request.Signature)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-
-			key, _, err := s.methodes.MessageDecoding(Request.Message)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-
-			givenValueVector, isThere, err := s.methodes.Get(key)
+			givenValueVector, isThere, err := s.methodes.Get(keyValue.Key)
 
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
@@ -224,7 +225,7 @@ func (s DHT) Open(mux *http.ServeMux) error {
 				value:              givenValueStruct.value,
 			})
 
-			err = s.methodes.Put(key, newGivenValueVector)
+			err = s.methodes.Put(keyValue.Key, newGivenValueVector)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
@@ -238,36 +239,14 @@ func (s DHT) Open(mux *http.ServeMux) error {
 	//////////////////////////////////////////////////////////////////////////////////
 	mux.HandleFunc(pattern("Put"), func(w http.ResponseWriter, req *http.Request) {
 
-		IPAddress := req.RemoteAddr
-		nodeInfo, ok := routingTable[IPAddress]
-
-		if !ok {
-			http.Error(w, "you are not authorized to access the system", http.StatusBadRequest)
-			return
-		}
-
-		req1, err := io.ReadAll(req.Body)
+		_, keyValue, err := step2(req)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		Request := RequestDecoding(req1)
-
-		err = encryption.VerifiSignature(&nodeInfo.PublicKey, Request.Message, Request.Signature)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		key, receivedValueVector, err := s.methodes.MessageDecoding(Request.Message)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		if s.isValueDynamic {
-			givenValueVector, isThere, err := s.methodes.Get(key)
+		if s.isValueUpdatable {
+			givenValueVector, isThere, err := s.methodes.Get(keyValue.Key)
 
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
@@ -279,7 +258,7 @@ func (s DHT) Open(mux *http.ServeMux) error {
 			}
 
 			givenValueStruct := valueDecoding(givenValueVector)
-			receivedValueStruct := valueDecoding(receivedValueVector)
+			receivedValueStruct := valueDecoding(keyValue.Value)
 
 			if givenValueStruct.Proposal > receivedValueStruct.Proposal {
 				http.Error(w, "your proposal is old", http.StatusBadRequest)
@@ -288,7 +267,7 @@ func (s DHT) Open(mux *http.ServeMux) error {
 		}
 
 	l:
-		err = s.methodes.Put(key, receivedValueVector)
+		err = s.methodes.Put(keyValue.Key, keyValue.Value)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -298,35 +277,13 @@ func (s DHT) Open(mux *http.ServeMux) error {
 	//////////////////////////////////////////////////////////////////////////////////
 	mux.HandleFunc(pattern("Get"), func(w http.ResponseWriter, req *http.Request) {
 
-		IPAddress := req.RemoteAddr
-		nodeInfo, ok := routingTable[IPAddress]
-
-		if !ok {
-			http.Error(w, "you are not authorized to access the system", http.StatusBadRequest)
-			return
-		}
-
-		req1, err := io.ReadAll(req.Body)
+		nodeInfo, keyValue, err := step2(req)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		Request := RequestDecoding(req1)
-
-		err = encryption.VerifiSignature(&nodeInfo.PublicKey, Request.Message, Request.Signature)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		key, _, err := s.methodes.MessageDecoding(Request.Message)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		givenValueVector, isThere, err := s.methodes.Get(key)
+		givenValueVector, isThere, err := s.methodes.Get(keyValue.Key)
 
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -338,7 +295,7 @@ func (s DHT) Open(mux *http.ServeMux) error {
 			return
 		}
 
-		if s.isValueDynamic {
+		if s.isValueUpdatable {
 
 			givenValueStruct := valueDecoding(givenValueVector)
 
@@ -353,7 +310,7 @@ func (s DHT) Open(mux *http.ServeMux) error {
 				value:              givenValueStruct.value,
 			})
 
-			err = s.methodes.Put(key, newGivenValueVector)
+			err = s.methodes.Put(keyValue.Key, newGivenValueVector)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -366,35 +323,13 @@ func (s DHT) Open(mux *http.ServeMux) error {
 	//////////////////////////////////////////////////////////////////////////////////
 	mux.HandleFunc(pattern("Get What ever it takes"), func(w http.ResponseWriter, req *http.Request) {
 
-		IPAddress := req.RemoteAddr
-		nodeInfo, ok := routingTable[IPAddress]
-
-		if !ok {
-			http.Error(w, "you are not authorized to access the system", http.StatusBadRequest)
-			return
-		}
-
-		req1, err := io.ReadAll(req.Body)
+		_, keyValue, err := step2(req)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		Request := RequestDecoding(req1)
-
-		err = encryption.VerifiSignature(&nodeInfo.PublicKey, Request.Message, Request.Signature)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		key, _, err := s.methodes.MessageDecoding(Request.Message)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		givenValueVector, isThere, err := s.methodes.Get(key)
+		givenValueVector, isThere, err := s.methodes.Get(keyValue.Key)
 
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -534,16 +469,6 @@ func extractTheRoutingTable() ([]nodeInfo, error) {
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-func (s DHT) NewRequest(key []byte, value []byte) *bytes.Reader {
-	message, err := s.methodes.MessageEncoding(key, value)
-	tools.PanicIfErr(err)
-
-	Signature, err := encryption.CreateSignature(myPrivetKey, message)
-	tools.PanicIfErr(err)
-
-	return bytes.NewReader(RequestEncoding(RequestStruct{message, Signature}))
-}
-
 func DoRequestToIP(IPAddress string, body *bytes.Reader) ([]byte, error) {
 	req, err := http.NewRequest(http.MethodPost, IPAddress, body)
 	if err != nil {
@@ -571,75 +496,30 @@ func DoRequestToIP(IPAddress string, body *bytes.Reader) ([]byte, error) {
 	return resBodyByte, nil
 }
 
-type ssssssssss struct {
-	hundle     func(mux *http.ServeMux)
-	requestAll func(key []byte, value []byte) ([][]byte, error)
-}
+func requestAll(s DHT, port uint, pattern string, key []byte, value []byte) ([][]byte, error) {
+	// body := s.NewRequest(key, value)
+	// allIPAddress := FindNearestNodes(key)
 
-func create(s DHT, IPAddress string, port uint, pattern string, process func(w http.ResponseWriter, req *http.Request, nodeInfo nodeInfo1, key []byte, value []byte)) ssssssssss {
-	jj := ssssssssss{}
+	// var AllError error
+	// var value1 []byte
 
-	url := ht.Url(IPAddress, port, s.dbName, pattern)
+	// var wait sync.WaitGroup
+	// for _, v := range allIPAddress {
+	// 	wait.Add(1)
+	// 	go func() {
+	// 		var err error
+	// 		value1, err = DoRequestToIP(ht.Url(v, port, s.dbName, pattern), body)
+	// 		errors.Join(AllError, err)
 
-	jj.hundle = func(mux *http.ServeMux) {
-		mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
-			nodeInfo, ok := routingTable[r.RemoteAddr]
+	// 		if err == nil {
 
-			if !ok {
-				http.Error(w, "you are not authorized to access the system", http.StatusBadRequest)
-				return
-			}
-
-			req1, err := io.ReadAll(r.Body)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-
-			Request := RequestDecoding(req1)
-
-			err = encryption.VerifiSignature(&nodeInfo.PublicKey, Request.Message, Request.Signature)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-
-			key, value, err := s.methodes.MessageDecoding(Request.Message)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-
-			process(w, r, nodeInfo, key, value)
-		})
-	}
-
-	jj.requestAll = func(key []byte, value []byte) ([][]byte, error) {
-		body := s.NewRequest(key, value)
-		allIPAddress := FindNearestNodes(key)
-
-		var AllError error
-		var value1 []byte
-
-		var wait sync.WaitGroup
-		for _, v := range allIPAddress {
-			wait.Add(1)
-			go func() {
-				var err error
-				value1, err = DoRequestToIP(ht.Url(v, port, s.dbName, pattern), body)
-				errors.Join(AllError, err)
-
-				if err == nil {
-
-				}
-				wait.Done()
-			}()
-		}
-		wait.Wait()
-		return nil, AllError
-	}
-
-	return jj
+	// 		}
+	// 		wait.Done()
+	// 	}()
+	// }
+	// wait.Wait()
+	// return nil, AllError
+	return nil, nil
 }
 
 type (
@@ -651,3 +531,48 @@ type (
 	Message              []byte
 	KeyHash              [32]byte
 )
+
+func step1(key []byte, value []byte) *bytes.Reader {
+	keyValue := KeyValueEncoding(KeyValueStruct{
+		Key:   key,
+		Value: value,
+	})
+
+	Signature, err := encryption.CreateSignature(myPrivetKey, keyValue)
+	tools.PanicIfErr(err)
+
+	return bytes.NewReader(MessageEncoding(MessageStruct{
+		KeyValue:  keyValue,
+		Signature: Signature,
+	}))
+}
+
+func step2(r *http.Request) (nodeInfo1, KeyValueStruct, error) {
+	nodeInfo, ok := routingTable[r.RemoteAddr]
+
+	if !ok {
+		return nodeInfo1{}, KeyValueStruct{}, errors.New("you are not authorized to access the system")
+	}
+
+	req1, err := io.ReadAll(r.Body)
+	if err != nil {
+		return nodeInfo1{}, KeyValueStruct{}, err
+	}
+
+	message := MessageDecoding(req1)
+
+	err = encryption.VerifiSignature(&nodeInfo.PublicKey, message.KeyValue, message.Signature)
+	if err != nil {
+		return nodeInfo1{}, KeyValueStruct{}, err
+	}
+
+	return nodeInfo, KeyValueDecoding(message.KeyValue), nil
+}
+
+func step3() {
+
+}
+
+func step4() {
+
+}

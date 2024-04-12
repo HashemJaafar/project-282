@@ -114,32 +114,32 @@ func Test1(t *testing.T) {
 	// 	Message:   []byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 	// 	Signature: []byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 	// }
-	a := tools.Rand[RequestStruct]()
+	a := tools.Rand[MessageStruct]()
 	tools.Benchmark(100000,
 		func() {
 			// a := tools.Rand[RequestStruct]()
 			a1, _ := tools.Encode(a)
-			tools.Decode[RequestStruct](a1)
+			tools.Decode[MessageStruct](a1)
 		},
 		func() {
 			// a := tools.Rand[RequestStruct]()
-			a1 := RequestEncoding(a)
-			RequestDecoding(a1)
+			a1 := MessageEncoding(a)
+			MessageDecoding(a1)
 		},
 	)
 }
 
 func Test2(t *testing.T) {
 	for i := 0; i < 100; i++ {
-		a := tools.Rand[RequestStruct]()
-		if a.Message == nil {
-			a.Message = []byte{}
+		a := tools.Rand[MessageStruct]()
+		if a.KeyValue == nil {
+			a.KeyValue = []byte{}
 		}
 		if a.Signature == nil {
 			a.Signature = []byte{}
 		}
-		a1 := RequestEncoding(a)
-		a2 := RequestDecoding(a1)
+		a1 := MessageEncoding(a)
+		a2 := MessageDecoding(a1)
 		tools.Test(false, true, "#v", a, a2)
 	}
 }
