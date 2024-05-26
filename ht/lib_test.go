@@ -16,19 +16,19 @@ func TestUrl(t *testing.T) {
 }
 
 const (
-	host = "localhost"
-	port = 8000
+	IPAddress = "localhost"
+	port      = 8000
 )
 
 func TestCreate(t *testing.T) {
-	f1 := Create(host, port, "/f1", func(req int) (string, error) { return fmt.Sprint(req), nil })
-	f2 := Create(host, port, "/f2", func(req string) (string, error) { return fmt.Sprint(req), nil })
-	f3 := Create(host, port, "/f3", func(req string) (error, error) { return fmt.Errorf(req), nil })
-	f4 := Create(host, port, "/f4", func(req error) (string, error) { return req.Error(), nil })
-	f5 := Create(host, port, "/f5", func(req int) (any, error) { return nil, nil })
-	f6 := Create(host, port, "/f6", func(req any) (int, error) { return 10, nil })
-	f7 := Create(host, port, "/f7", func(req any) (string, error) { return fmt.Sprint(req), nil })
-	f8 := Create(host, port, "/f8", func(req bool) (Useless, error) { return struct{}{}, nil })
+	f1 := Create(IPAddress, port, "/f1", func(req int) (string, error) { return fmt.Sprint(req), nil })
+	f2 := Create(IPAddress, port, "/f2", func(req string) (string, error) { return fmt.Sprint(req), nil })
+	f3 := Create(IPAddress, port, "/f3", func(req string) (error, error) { return fmt.Errorf(req), nil })
+	f4 := Create(IPAddress, port, "/f4", func(req error) (string, error) { return req.Error(), nil })
+	f5 := Create(IPAddress, port, "/f5", func(req int) (any, error) { return nil, nil })
+	f6 := Create(IPAddress, port, "/f6", func(req any) (int, error) { return 10, nil })
+	f7 := Create(IPAddress, port, "/f7", func(req any) (string, error) { return fmt.Sprint(req), nil })
+	f8 := Create(IPAddress, port, "/f8", func(req bool) (Useless, error) { return struct{}{}, nil })
 
 	go func() {
 		mux := http.NewServeMux()
@@ -40,10 +40,10 @@ func TestCreate(t *testing.T) {
 		f6.Handle(mux)
 		f7.Handle(mux)
 		f8.Handle(mux)
-		ListenAndServe(mux, host, port)
+		ListenAndServe(mux, IPAddress, port)
 	}()
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 
 	{
 		r, err := f1.Request(1)
@@ -93,12 +93,12 @@ func TestCreate(t *testing.T) {
 }
 
 func Test(t *testing.T) {
-	f1 := Create(host, port, "/f1", func(req bool) (string, error) {
+	f1 := Create(IPAddress, port, "/f1", func(req bool) (string, error) {
 		fmt.Println("f1 is work")
 		time.Sleep(10 * time.Second)
 		return fmt.Sprintf("f1 is complete %v", time.Now()), nil
 	})
-	f2 := Create(host, port, "/f2", func(req bool) (string, error) {
+	f2 := Create(IPAddress, port, "/f2", func(req bool) (string, error) {
 		fmt.Println("f2 is work")
 		time.Sleep(10 * time.Second)
 		return fmt.Sprintf("f2 is complete %v", time.Now()), nil
@@ -108,7 +108,7 @@ func Test(t *testing.T) {
 		mux := http.NewServeMux()
 		f1.Handle(mux)
 		f2.Handle(mux)
-		ListenAndServe(mux, host, port)
+		ListenAndServe(mux, IPAddress, port)
 	}()
 
 	time.Sleep(100 * time.Millisecond)
@@ -133,18 +133,4 @@ func Test(t *testing.T) {
 	wait.Wait()
 
 	time.Sleep(15 * time.Second)
-}
-
-func Test1(t *testing.T) {
-	go func() {
-		mux := http.NewServeMux()
-		HandleFunc1(mux, "/f1", func(req []byte) ([]byte, error) { return req, nil })
-		ListenAndServe(mux, host, port)
-	}()
-
-	time.Sleep(100 * time.Millisecond)
-
-	b, err := NewRequest1(host, port, "/f1", []byte("hi there"))
-	fmt.Println(string(b))
-	fmt.Println(err)
 }

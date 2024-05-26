@@ -287,7 +287,7 @@ func Test[t any](print, isEqual bool, format string, actual, expected t) {
 	}
 }
 
-func Benchmark(loops uint, codesBlock ...func()) {
+func Benchmark(loops uint, codesBlocks ...func()) {
 	type element struct {
 		blockIndex int
 		duration   time.Duration
@@ -295,7 +295,7 @@ func Benchmark(loops uint, codesBlock ...func()) {
 
 	var list []element
 
-	for blockIndex, codeBlock := range codesBlock {
+	for blockIndex, codeBlock := range codesBlocks {
 		start := time.Now()
 
 		for i := uint(0); i < loops; i++ {

@@ -1,0 +1,105 @@
+Count      Type            Name                
+-----      ----            ----                
+1          Func            Close               
+1          Func            Copy                
+1          Type            DHT                 
+1          Func            Delete              
+1          Func            FindNearestNodes    
+1          Func            Get                 
+1          Func            GetAndLock          
+1          Type            IPAddress           
+1          Type            Key                 
+1          Type            KeyHash             
+3          Local Var       KeySize             
+1          Func            KeyValueLineDecoding
+1          Func            KeyValueLineEncoding
+1          Type            KeyValueLineStruct  
+1          Type            KeyValueLineVector  
+1          Type            Message             
+1          Global Var      MessageByte         
+1          Func            MessageFormDecoding 
+1          Func            MessageFormEncoding 
+1          Func            MessageFormSign     
+1          Type            MessageFormStruct   
+1          Type            MessageFormVector   
+1          Func            MessageFormVerifi   
+1          Local Var       MessageSize         
+1          Type            NodeId              
+2          Local Var       NodeIdAsBytes       
+1          Local Var       NodeIdAsHash        
+1          Local Var       NodeIdAsInt         
+1          Global Var      NonceByte           
+1          Type            NumberOfVirtualNodes
+1          Func            Open                
+1          Func            Put                 
+1          Const           RoutingTable        
+1          Local Var       Signature           
+1          Global Var      SignatureByte       
+1          Func            Test1               
+1          Func            Test2               
+1          Func            Unlock              
+1          Func            UpdateRoutingTable  
+1          Type            Value               
+4          Local Var       ValueLineStruct1    
+4          Local Var       ValueLineVector1    
+2          Local Var       ValueLineVector2    
+1          Func            VerifiIfITheNearest 
+1          Local Var       VirtualNodes        
+4          Local Var       _                   
+2          Local Var       a                   
+3          Local Var       a1                  
+1          Local Var       a2                  
+2          Local Var       address             
+1          Local Var       body                
+1          Local Var       client              
+2          Local Var       closestIPAddress    
+1          Local Var       currentDiff         
+1          Local Var       data                
+2          Local Var       diff                
+41         Local Var       err                 
+1          Func            httpError           
+3          Local Var       i                   
+1          Local Var       info                
+1          Local Var       ipAddresses         
+4          Local Var       isThere             
+1          Local Var       jsonData            
+1          Local Var       keyAsInt            
+6          Local Var       keyValueLineStruct  
+1          Global Var      leader              
+3          Local Var       m                   
+2          Local Var       maxNumberOfVirtualNodes
+11         Local Var       message             
+2          Local Var       message1            
+1          Interface       methodes            
+1          Global Var      myPrivetKey         
+1          Global Var      myType              
+6          Local Var       nodeInfo            
+1          Type            nodeInfo1           
+1          Type            nodeInfo2           
+1          Global Var      nonce               
+5          Local Var       ok                  
+1          Local Var       pattern             
+1          Const           port                
+1          Const           prefix              
+1          Local Var       publicKey           
+1          Func            readJSONFile        
+1          Func            readTheRoutingTable 
+1          Local Var       receivedValueStruct 
+1          Local Var       req                 
+5          Local Var       req1                
+1          Func            request             
+1          Func            requestAll          
+1          Local Var       res                 
+1          Local Var       resBodyByte         
+2          Local Var       routingTable        
+2          Method          s                   
+1          Func            setRoutingTable     
+1          Func            storeStructToJSON   
+1          Func            storeTheRoutingTable
+2          Local Var       table               
+1          Func            valueLineDecoding   
+1          Func            valueLineEncoding   
+1          Type            valueLineStruct     
+1          Type            valueLineVector     
+1          Func            write               
+1          Local Var       x                   
