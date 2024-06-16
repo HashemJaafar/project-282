@@ -1,32 +1,13 @@
 package main
 
 import (
-	"encryption"
-	"reflect"
+	"ht"
+	"net/http"
 	"testing"
 	"tools"
 )
 
-func Test1(t *testing.T) {
-	a := MessageFormType{
-		Nonce:     []uint8{0xf9, 0x3e, 0x27, 0xc5, 0x66, 0xe6, 0x59, 0x61},
-		Message:   []uint8{0xf9, 0x3e, 0x27, 0xc5, 0x66, 0xe6, 0x59, 0x61},
-		Signature: encryption.Signature{0xc2},
-	}
-
-	tools.Benchmark(100000,
-		func() {
-			a1, _ := tools.Encode(a)
-			tools.Decode[MessageFormType](a1)
-		},
-		func() {
-			a1 := MessageFormEncoding(a)
-			MessageFormDecoding(a1)
-		},
-	)
-}
-
-func Test2(t *testing.T) {
+func Test(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		a := tools.Rand[MessageFormType]()
 		if len(a.Nonce) != 8 {
@@ -44,34 +25,49 @@ func Test2(t *testing.T) {
 	}
 }
 
-func Test(t *testing.T) {
+var ma1 map[string]string
 
-	for i := 0; i < 100; i++ {
+type m1 struct{}
 
-		original := tools.Rand[BatchType]()
-
-		if reflect.DeepEqual(original.Batch, [][]uint8(nil)) {
-			continue
-		}
-		original.Batch = Compact(original.Batch)
-
-		encoded := BatchEncoding(original)
-		decoded, err := BatchDecoding(encoded)
-		tools.Test(false, true, "v", err, nil)
-		tools.Test(false, true, "#v", decoded, original)
-	}
+func (m1) Open() error {
+	ma1 = make(map[string]string)
+	return nil
 }
 
-func Compact(data [][]byte) [][]byte {
-	var result [][]byte
+func (m1) Close() error {
+	return nil
+}
 
-	for _, slice := range data {
-		if len(slice) == 0 || slice == nil {
-			continue // Skip empty slices
-		}
+func (m1) Loop(i func(key Key, value valueLineVector)) error {
+	for k, v := range ma1 {
+		i(Key(k), valueLineVector(v))
+	}
+	return nil
+}
 
-		result = append(result, slice)
+func (m1) Put(key []byte, value []byte) error {
+	ma1[string(key)] = string(value)
+	return nil
+}
+
+func (m1) Get(key []byte) ([]byte, bool, error) {
+	value, ok := ma1[string(key)]
+	return []byte(value), ok, nil
+}
+
+func (m1) Delete(key []byte) error {
+	delete(ma1, string(key))
+	return nil
+}
+
+func Test1(t *testing.T) {
+	a := DHT{
+		methodes:         m1{},
+		dbName:           "hi",
+		isValueUpdatable: true,
 	}
 
-	return result
+	mux := http.NewServeMux()
+	Open(a, mux)
+	ht.ListenAndServe(mux)
 }

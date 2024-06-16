@@ -170,3 +170,130 @@ func Test7(t *testing.T) {
 	Debug("v", Stack())
 	Debug("v", Rand[int]())
 }
+
+// // AnyFunc accepts any function as input, generates random arguments, and calls it.
+// func AnyFunc(fn interface{}) []interface{} {
+// 	fnType := reflect.TypeOf(fn)
+
+// 	// Generate random arguments for the function
+// 	in := make([]reflect.Value, fnType.NumIn())
+// 	for i := 0; i < fnType.NumIn(); i++ {
+// 		argType := fnType.In(i)
+// 		argValue := reflect.New(argType).Elem()
+
+// 		// Handle different types of arguments
+// 		switch argType.Kind() {
+// 		case reflect.Interface:
+// 			if argType.Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+// 				// For other interfaces, set to a nil value of the interface type
+// 				argValue.Set(reflect.Zero(argType))
+// 			}
+// 		case reflect.Chan:
+// 			// Create a channel with a buffer of 1
+// 			argValue.Set(reflect.MakeChan(argType, 1))
+// 		case reflect.Func:
+// 			// Create a function that matches the type
+// 			argValue.Set(reflect.MakeFunc(argType, func(args []reflect.Value) []reflect.Value {
+// 				// Just return zero values for the function's return types
+// 				results := make([]reflect.Value, argType.NumOut())
+// 				for i := 0; i < argType.NumOut(); i++ {
+// 					results[i] = reflect.Zero(argType.Out(i))
+// 				}
+// 				return results
+// 			}))
+// 		default:
+// 			// Default fuzzing for other types
+// 			fuzz.New().Fuzz(argValue.Addr().Interface())
+// 		}
+
+// 		time.Sleep(1 * time.Microsecond) // Prevents collisions
+
+// 		in[i] = argValue
+// 	}
+
+// 	// Call the function using reflection
+// 	fnValue := reflect.ValueOf(fn)
+// 	results := fnValue.Call(in)
+
+// 	// Convert results from reflect.Values to interfaces
+// 	out := make([]interface{}, len(results))
+// 	for i, result := range results {
+// 		out[i] = result.Interface()
+// 	}
+
+// 	return out
+// }
+
+// func add(a, b int) int {
+// 	return a + b
+// }
+
+// func greet(name string) string {
+// 	return "Hello, " + name
+// }
+
+// func Test8(t *testing.T) {
+// 	fmt.Println(AnyFunc(add))
+// 	fmt.Println(AnyFunc(greet))
+// 	fmt.Println(AnyFunc(Errorf))
+// }
+
+// // CallFunction takes a function and its arguments, then calls the function and returns the result
+// func CallFunction(fn interface{}, args ...interface{}) []interface{} {
+// 	fnValue := reflect.ValueOf(fn)
+
+// 	// Ensure that the provided argument is actually a function
+// 	if fnValue.Kind() != reflect.Func {
+// 		log.Fatal("provided argument is not a function")
+// 	}
+
+// 	if reflect.TypeOf(fn).NumIn() != len(args) {
+// 		log.Fatal("the number of input is not same")
+// 	}
+
+// 	// Prepare reflect.Value arguments for the function call
+// 	fnArgs := make([]reflect.Value, len(args))
+// 	for i, arg := range args {
+// 		// TODO here i want you to edit the arg and make it random put the type is same
+
+// 		argValue := reflect.New(reflect.TypeOf(arg)).Elem()
+
+// 		fuzz.New().Fuzz(argValue.Addr().Interface())
+// 		time.Sleep(1 * time.Microsecond)
+// 		fnArgs[i] = argValue
+
+// 		// a := reflect.ValueOf(arg)
+// 		// fnArgs[i] = a.Call(nil)[0]
+// 		// fnArgs[i] = reflect.ValueOf(arg)
+// 	}
+
+// 	// Call the function and get the results
+// 	results := fnValue.Call(fnArgs)
+
+// 	out := make([]interface{}, len(results))
+// 	for i, result := range results {
+// 		out[i] = result.Interface()
+// 	}
+// 	fmt.Println(fnArgs, out)
+
+// 	return out
+// }
+
+// func Test9(t *testing.T) {
+// 	// Example usage
+// 	fmt.Println(CallFunction(add, int(3), int(2)))
+// 	fmt.Println(CallFunction(add, int(9), int(8)))
+// 	fmt.Println(CallFunction(greet, ""))
+// 	fmt.Println(CallFunction(Errorf, "hashem"))
+// }
+
+// func generateTest(rounds int, fn func() ([]any, []any)) {
+// 	for i := 0; i < rounds; i++ {
+// 		input, output := fn()
+
+// 	}
+// }
+// func printTest(print bool, isEqual bool, format string, actual string, expected any) {
+
+// 	fmt.Printf("tools.Test(%v, %v, %s, %s, %#v)", print, true, format, actual, expected)
+// }

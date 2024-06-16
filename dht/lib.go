@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"ht"
 	"io"
+	"log"
 	"math/big"
 	"math/rand"
 	"net/http"
@@ -18,10 +19,6 @@ import (
 	"slices"
 	"time"
 	"tools"
-)
-
-const (
-	port = 8080
 )
 
 type (
@@ -86,93 +83,11 @@ func KeyValueLineDecoding(i KeyValueLineVector) KeyValueLineType {
 }
 
 type (
-	BatchVector []byte
-
-	BatchType struct {
-		PreviousHash [32]byte
-		Batch        [][]byte
-	}
-)
-
-func BatchEncoding(batch BatchType) BatchVector {
-	totalLength := batchVirtualLen(batch)
-
-	// Allocate memory for the encoded batch
-	encoded := make([]byte, totalLength)
-	offset := 0
-
-	// Copy the PreviousHash to the encoded batch
-	copy(encoded[offset:], batch.PreviousHash[:])
-	offset += 32
-
-	// Encode the number of slices
-	binary.BigEndian.PutUint32(encoded[offset:], uint32(len(batch.Batch)))
-	offset += 4
-
-	// Encode each slice
-	for _, slice := range batch.Batch {
-		// Encode the length of the slice
-		binary.BigEndian.PutUint32(encoded[offset:], uint32(len(slice)))
-		offset += 4
-
-		// Copy the slice data
-		copy(encoded[offset:], slice)
-		offset += len(slice)
-	}
-
-	return encoded
-}
-
-func BatchDecoding(data BatchVector) (BatchType, error) {
-	if len(data) < 36 {
-		return BatchType{}, errors.New("invalid encoded data length")
-	}
-
-	var batch BatchType
-
-	// Copy the PreviousHash from the encoded data
-	copy(batch.PreviousHash[:], data[:32])
-
-	// Decode the number of slices
-	numSlices := binary.BigEndian.Uint32(data[32:36])
-	if len(data) < int(36+(4*numSlices)) {
-		return BatchType{}, errors.New("invalid encoded data length")
-	}
-
-	offset := 36
-
-	// Decode each slice
-	batch.Batch = make([][]byte, numSlices)
-	for i := uint32(0); i < numSlices; i++ {
-		// Decode the length of the slice
-		sliceLength := binary.BigEndian.Uint32(data[offset : offset+4])
-		offset += 4
-
-		// Copy the slice data
-		slice := make([]byte, sliceLength)
-		copy(slice, data[offset:offset+int(sliceLength)])
-		batch.Batch[i] = slice
-
-		offset += int(sliceLength)
-	}
-
-	return batch, nil
-}
-
-func batchVirtualLen(i BatchType) int {
-	totalLength := 32 + 4
-	for _, slice := range i.Batch {
-		totalLength += 4 + len(slice)
-	}
-	return totalLength
-}
-
-type (
 	MessageFormVector []byte
 
 	MessageFormType struct {
 		Nonce     []byte //8 byte
-		Message   []byte
+		Message   Message
 		Signature encryption.Signature
 	}
 )
@@ -218,8 +133,6 @@ func MessageFormVerifi(publicKey *rsa.PublicKey, i MessageFormType) error {
 	return nil
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 type nodeInfo struct {
 	IPAddress            IPAddress
 	NodeId               NodeId // should not use 0
@@ -238,16 +151,8 @@ type nodeInfo1 struct {
 var maxNumberOfVirtualNodes uint8
 var routingTable = make(map[IPAddress]nodeInfo1)
 var myPrivetKey *rsa.PrivateKey
-
-type nodeInfo2 struct {
-	IPAddress IPAddress
-	PublicKey rsa.PublicKey
-}
-
-var leader = nodeInfo2{
-	IPAddress: "",
-	PublicKey: rsa.PublicKey{},
-}
+var leaderIPAddress IPAddress
+var leaderPublicKey rsa.PublicKey
 
 type DHT struct {
 	methodes         methodes
@@ -272,7 +177,7 @@ func UpdateRoutingTable(mux *http.ServeMux) {
 
 	mux.HandleFunc("/UpdateRoutingTable", func(w http.ResponseWriter, req *http.Request) {
 
-		if IPAddress(req.RemoteAddr) != leader.IPAddress {
+		if IPAddress(req.RemoteAddr) != leaderIPAddress {
 			http.Error(w, "you are not the leader", http.StatusBadRequest)
 			return
 		}
@@ -285,7 +190,7 @@ func UpdateRoutingTable(mux *http.ServeMux) {
 
 		message := MessageFormDecoding(body)
 
-		err = MessageFormVerifi(&leader.PublicKey, message)
+		err = MessageFormVerifi(&leaderPublicKey, message)
 		if err != nil {
 			httpError(w, message, err.Error())
 			return
@@ -309,7 +214,7 @@ func UpdateRoutingTable(mux *http.ServeMux) {
 	})
 }
 
-func (s DHT) Open(mux *http.ServeMux) error {
+func Open(s DHT, mux *http.ServeMux) error {
 	err := s.methodes.Open()
 	if err != nil {
 		return err
@@ -321,13 +226,80 @@ func (s DHT) Open(mux *http.ServeMux) error {
 
 	//share data
 	go func() {
+		// Create a log file
+		file, err := os.OpenFile("log.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			log.Fatalf("Failed to open log file: %s", err)
+		}
+		defer file.Close()
+
+		// Set output of logs to the file
+		log.SetOutput(file)
 		for {
 			s.methodes.Loop(func(key Key, value valueLineVector) {
-				Put(key, value)
+				_, err := requestAll("share", key, value)
+				if err != nil {
+					log.Println(err)
+				}
 			})
 		}
 	}()
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	mux.HandleFunc(pattern("share"), func(w http.ResponseWriter, req *http.Request) {
+
+		nodeInfo, ok := routingTable[IPAddress(req.RemoteAddr)]
+		if !ok {
+			http.Error(w, "you are not authorized to access the system", http.StatusBadRequest)
+			return
+		}
+
+		req1, err := io.ReadAll(req.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		message := MessageFormDecoding(req1)
+
+		err = MessageFormVerifi(&nodeInfo.PublicKey, message)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		KeyValueLineType := KeyValueLineDecoding(KeyValueLineVector(message.Message))
+
+		if s.isValueUpdatable {
+			ValueLineVector1, isThere, err := s.methodes.Get(KeyValueLineType.Key)
+
+			if err != nil {
+				httpError(w, message, err.Error())
+				return
+			}
+
+			if !isThere {
+				goto l
+			}
+
+			ValueLineType1 := valueLineDecoding(ValueLineVector1)
+			receivedValueType := valueLineDecoding(KeyValueLineType.Value)
+
+			if ValueLineType1.Proposal > receivedValueType.Proposal {
+				httpError(w, message, "your proposal is old")
+				return
+			}
+		} else {
+			x := sha256.Sum256(KeyValueLineType.Value)
+			KeyValueLineType.Key = x[:]
+		}
+
+	l:
+		err = s.methodes.Put(KeyValueLineType.Key, KeyValueLineType.Value)
+		if err != nil {
+			httpError(w, message, err.Error())
+			return
+		}
+	})
 
 	if s.isValueUpdatable {
 		mux.HandleFunc(pattern("Unlock"), func(w http.ResponseWriter, req *http.Request) {
@@ -352,7 +324,7 @@ func (s DHT) Open(mux *http.ServeMux) error {
 				return
 			}
 
-			KeyValueLineType := KeyValueLineDecoding(message.Message)
+			KeyValueLineType := KeyValueLineDecoding(KeyValueLineVector(message.Message))
 			ValueLineVector1, isThere, err := s.methodes.Get(KeyValueLineType.Key)
 
 			if err != nil {
@@ -388,8 +360,6 @@ func (s DHT) Open(mux *http.ServeMux) error {
 		})
 	}
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 	mux.HandleFunc(pattern("Put"), func(w http.ResponseWriter, req *http.Request) {
 
 		nodeInfo, ok := routingTable[IPAddress(req.RemoteAddr)]
@@ -412,7 +382,7 @@ func (s DHT) Open(mux *http.ServeMux) error {
 			return
 		}
 
-		KeyValueLineType := KeyValueLineDecoding(message.Message)
+		KeyValueLineType := KeyValueLineDecoding(KeyValueLineVector(message.Message))
 
 		if s.isValueUpdatable {
 			ValueLineVector1, isThere, err := s.methodes.Get(KeyValueLineType.Key)
@@ -448,8 +418,6 @@ func (s DHT) Open(mux *http.ServeMux) error {
 		write(w, message, []byte("done"))
 	})
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 	mux.HandleFunc(pattern("GetAndLock"), func(w http.ResponseWriter, req *http.Request) {
 
 		nodeInfo, ok := routingTable[IPAddress(req.RemoteAddr)]
@@ -472,7 +440,7 @@ func (s DHT) Open(mux *http.ServeMux) error {
 			return
 		}
 
-		KeyValueLineType := KeyValueLineDecoding(message.Message)
+		KeyValueLineType := KeyValueLineDecoding(KeyValueLineVector(message.Message))
 
 		ValueLineVector1, isThere, err := s.methodes.Get(KeyValueLineType.Key)
 
@@ -511,8 +479,6 @@ func (s DHT) Open(mux *http.ServeMux) error {
 		write(w, message, ValueLineVector1)
 	})
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 	mux.HandleFunc(pattern("Get"), func(w http.ResponseWriter, req *http.Request) {
 
 		nodeInfo, ok := routingTable[IPAddress(req.RemoteAddr)]
@@ -535,7 +501,7 @@ func (s DHT) Open(mux *http.ServeMux) error {
 			return
 		}
 
-		KeyValueLineType := KeyValueLineDecoding(message.Message)
+		KeyValueLineType := KeyValueLineDecoding(KeyValueLineVector(message.Message))
 
 		ValueLineVector1, isThere, err := s.methodes.Get(KeyValueLineType.Key)
 
@@ -553,8 +519,6 @@ func (s DHT) Open(mux *http.ServeMux) error {
 
 		write(w, message, ValueLineType1.value)
 	})
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	mux.HandleFunc(pattern("Delete"), func(w http.ResponseWriter, req *http.Request) {
 
@@ -578,7 +542,7 @@ func (s DHT) Open(mux *http.ServeMux) error {
 			return
 		}
 
-		KeyValueLineType := KeyValueLineDecoding(message.Message)
+		KeyValueLineType := KeyValueLineDecoding(KeyValueLineVector(message.Message))
 
 		err = s.methodes.Delete(KeyValueLineType.Key)
 
@@ -607,15 +571,8 @@ func write(w http.ResponseWriter, message MessageFormType, theMessage []byte) {
 	w.Write(message1)
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-func (s DHT) Close() error {
+func Close(s DHT) error {
 	return s.methodes.Close()
-}
-
-func ShareData() error {
-	//TODO
-	return nil
 }
 
 func Unlock(key Key) error {
@@ -649,9 +606,9 @@ func Delete(key Key) error {
 	return err
 }
 
-func request(IPAddress IPAddress, publicKey *rsa.PublicKey, pattern string, nonce []byte, body io.Reader) (Message, error) {
+func request(url string, publicKey *rsa.PublicKey, nonce []byte, body io.Reader) (Message, error) {
 
-	req, err := http.NewRequest(http.MethodPost, ht.Url(string(IPAddress), port, pattern), body)
+	req, err := http.NewRequest(http.MethodPost, url, body)
 	if err != nil {
 		return nil, err
 	}
@@ -687,27 +644,24 @@ func request(IPAddress IPAddress, publicKey *rsa.PublicKey, pattern string, nonc
 	return message.Message, nil
 }
 
-func requestAll(pattern string, key []byte, value []byte) (Message, error) {
-	KeyValueLineType := KeyValueLineEncoding(KeyValueLineType{
-		Key:   key,
-		Value: value,
-	})
+func requestAll(port uint, pattern string, keyValueLineType KeyValueLineType) (Message, error) {
+	KeyValueLineType := KeyValueLineEncoding(keyValueLineType)
 
 	var nonce []byte
 	binary.BigEndian.PutUint64(nonce, rand.Uint64())
 
 	m := bytes.NewReader(MessageFormEncoding(MessageFormSign(myPrivetKey, MessageFormType{
 		Nonce:     nonce,
-		Message:   KeyValueLineType,
+		Message:   Message(KeyValueLineType),
 		Signature: []byte{},
 	})))
 
 	var message Message
 	var err error
-	ipAddresses := FindNearestNodes(key)
+	ipAddresses := FindNearestNodes(sha256.Sum256(keyValueLineType.Key))
 	for _, ipAddress := range ipAddresses {
 		publicKey := routingTable[IPAddress(ipAddress)].PublicKey
-		message, err = request(ipAddress, &publicKey, pattern, nonce, m)
+		message, err = request(ht.Url(string(ipAddress), port, pattern), &publicKey, nonce, m)
 		if err != nil {
 			return nil, err
 		}
@@ -716,10 +670,10 @@ func requestAll(pattern string, key []byte, value []byte) (Message, error) {
 	return message, nil
 }
 
-func FindNearestNodes(key []byte) []IPAddress {
+func FindNearestNodes(key KeyHash) []IPAddress {
 	var address []IPAddress
 	keyAsInt := big.NewInt(256)
-	keyAsInt.SetBytes(key)
+	keyAsInt.SetBytes(key[:])
 
 	for i := 0; i < int(maxNumberOfVirtualNodes); i++ {
 
@@ -742,11 +696,6 @@ func FindNearestNodes(key []byte) []IPAddress {
 		address = append(address, closestIPAddress)
 	}
 	return address
-}
-
-func VerifiIfITheNearest(VirtualNodes []big.Int, key []byte) bool {
-	//TODO
-	return false
 }
 
 func setRoutingTable(table []nodeInfo) {
@@ -782,8 +731,6 @@ func setRoutingTable(table []nodeInfo) {
 		routingTable[v.IPAddress] = info
 	}
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func storeStructToJSON(data any, filename string) error {
 	jsonData, err := json.Marshal(data)
@@ -825,55 +772,3 @@ func storeTheRoutingTable(table []nodeInfo) error {
 func readTheRoutingTable() ([]nodeInfo, error) {
 	return readJSONFile[[]nodeInfo](RoutingTable)
 }
-
-// func BatchEncoding(i BatchType) BatchVector {
-// 	totalLength := batchVirtualLen(i)
-
-// 	result := make([]byte, totalLength)
-// 	buf := result
-
-// 	for _, slice := range i {
-// 		length := len(slice)
-// 		binary.BigEndian.PutUint32(buf[:4], uint32(length))
-// 		buf = buf[4:]
-
-// 		copy(buf, slice)
-// 		buf = buf[length:]
-// 	}
-
-// 	return result
-// }
-
-// func batchVirtualLen(i BatchType) int {
-// 	var totalLength int
-
-// 	for _, slice := range i {
-// 		totalLength += 4 + len(slice)
-// 	}
-// 	return totalLength
-// }
-
-// func BatchDecoding(i BatchVector) (BatchType, error) {
-// 	var result [][]byte
-// 	buf := i
-
-// 	for len(buf) > 0 {
-// 		if len(buf) < 4 {
-// 			return nil, errors.New("invalid encoded data")
-// 		}
-
-// 		length := binary.BigEndian.Uint32(buf[:4])
-// 		buf = buf[4:]
-
-// 		if len(buf) < int(length) {
-// 			return nil, errors.New("invalid encoded data")
-// 		}
-
-// 		slice := buf[:length]
-// 		buf = buf[length:]
-
-// 		result = append(result, slice)
-// 	}
-
-// 	return result, nil
-// }
